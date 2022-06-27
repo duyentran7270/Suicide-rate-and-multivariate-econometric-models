@@ -1,0 +1,324 @@
+label variable Code "Country Code"
+label variable Entity "Country"
+label variable area_code "Area code"
+label variable incomegroup "Income group"
+label variable var0_suiciderate "Suicide rate"
+label variable var1_humanrightprotection "Human right protection index"
+label variable var2_civilliberties "Civil Liberties"
+label variable var3_corruptionperceptionindex "Corruption perception idex"
+label variable var4_humandevelopmentindex "Human Development Index"
+label variable var5_sexratioatbirth "Sex ratio at birth"
+label variable var6_internetusage "Internet usage rate"
+label variable var7_lifesatisfaction "Life Satisfaction"
+label variable var8_extremepoverty "Extreme poverty"
+label variable var9_giniindex "Gini index"
+label variable var10_shareof1personhousehold "Share of 1-person household"
+label variable var11_crudemarriagerate "Crude marriage rate"
+label variable var12_crudedivorcerate "Crude divorce rate"
+label variable var13_gdppercapitappp "Gdp per capita ppp"
+label variable var14_gdpgrowthrate "Gdp growth rate"
+label variable var15_inflation "Inflation"
+label variable var16_unemploymentrate "Unemployment rate"
+label variable var17_laborparticipationrate "Labor participation rate"
+label variable var18_annualworkinghours "Annual working hours"
+label variable var19_annualhealthexpenditure "Annual health expenditure per capita"
+label variable var20_anxietydisorder "Anxiety disorder rate"
+label variable var21_depression "Depression"
+label variable var21_depression "Depression rate"
+label variable var22_mentalhealth "Mental health rate"
+label variable var23_alcoholanddrug "Alcohol and drug use disorder"
+
+gen lngdppc = ln(var13_gdppercapitappp)
+gen lnhealth = ln(var19_annualhealthexpenditure)
+gen lnworkhour = ln(var18_annualworkinghours)
+
+* normality test
+swilk var0_suiciderate var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var9_giniindex var10_shareof1personhousehold var11_crudemarriagerate var12_crudedivorcerate lngdppc var14_gdpgrowthrate var15_inflation var16_unemploymentrate var17_laborparticipationrate lnworkhour lnhealth var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug
+ 
+* check correlation in different group: 
+	* political factor
+pwcorr var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex, obs sig
+		*-> they correlate to each other so well ~0.7
+pwcorr var0_suiciderate var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex, obs sig
+		*-> check with suicide rate, suicide rate does not correlate to them ~0.1
+
+	* social factor
+pwcorr var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var9_giniindex var10_shareof1personhousehold var11_crudemarriagerate var12_crudedivorcerate, obs sig
+		*-> some correlate, some do not. 
+pwcorr var0_suiciderate var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var9_giniindex var10_shareof1personhousehold var11_crudemarriagerate var12_crudedivorcerate, obs sig
+		*-> check with suicide rate, suicide rate does not correlate to them well, all < 0.5. Only var11 0.58
+	
+	* economic factor
+pwcorr lngdppc var14_gdpgrowthrate var15_inflation var16_unemploymentrate var17_laborparticipationrate lnworkhour lnhealth, obs sig 
+pwcorr var0_suiciderate lngdppc var14_gdpgrowthrate var15_inflation var16_unemploymentrate var17_laborparticipationrate lnworkhour lnhealth, obs sig 
+	
+	* health factor
+pwcorr var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug, obs sig
+pwcorr var0_suiciderate var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug, obs sig
+
+	* all
+pwcorr, obs sig
+		* -> the most correlated with var0 is var12 (divorce rate)
+
+* drop variables with missing values
+drop var10_shareof1personhousehold var11_crudemarriagerate var12_crudedivorcerate var13_gdppercapitappp lnworkhour var18_annualworkinghours var19_annualhealthexpenditure
+
+*check normality again
+swilk var0_suiciderate var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var9_giniindex lngdppc var14_gdpgrowthrate var15_inflation var16_unemploymentrate var17_laborparticipationrate lnhealth var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug
+
+*Factor analysis using principal component method, extracting factors with eigenvalue >1. 	
+
+	* POLITICAL AND SOCIAL FACTORS: 
+factor var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction 
+		*-> In factor loading uniqueness of var5 is too high (0.7) => remove var 5 in the factor analysis. 
+factor var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var4_humandevelopmentindex var6_internetusage var7_lifesatisfaction
+*rotation with Varimax method, do not show loadings <.35
+rotate, kaiser blanks(0.35)
+	* -> 1,2,3 go to factor 2 and 4,6,7 go to factor 1. 
+	* now we can replace 6 variables with 2 factors. 
+estat kmo
+	* to check if each variable correlates enough with sum of the other variables. 
+	* kmo>0.6 means it correlates enough. 
+	* the overall value tells how well those variable correlates to each other. => all the numbers look really nice, they correlate so well. 
+*descriptives of each item
+estat summarize, labels
+	* to see if they have bad outlier observations. If std is very large compared to mean. There is outliers. 	
+	* var1 has std>mean. check histogram of var1, there is no outliers. 
+*Reliability analysis for each factor separately, creating new variables as means of items*
+alpha var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex,detail item label generate (political)
+alpha var4_humandevelopmentindex var6_internetusage var7_lifesatisfaction ,detail item label generate (social)
+	* reliability should be made for each factor separately. 
+	* first line above is for factor 1 and the second is for factor 2. 
+	* the higher alpha the better. Alpha should be >0.6
+	* the higher correlation the higher the alpha. the more variable the higher the alpha. 
+	* if the variables correlated to each other very strong you dont need many variable for the reliability. 
+	* means how each variable correlated with the combination of the 6 variables. 
+	* item-rest is how each variable is correlated with the other 5.  
+	* alpha column tells us which variable excluded will increase test scale alpha. Find that variable and remove it. 
+	* test scale alpha is very good now. So maybe not remove any. 
+	* if we remove variable the highest alpha, the test scale alpha increase and vice versa. 
+	* check covariance between each variable with interitem covariance. 
+	
+
+	* ECONOMIC AND HEALTH FACTORS
+factor lngdppc lnhealth var20_anxietydisorder var22_mentalhealth
+
+	* Stepwise Linear regression 
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var9_giniindex var14_gdpgrowthrate var15_inflation var16_unemploymentrate var17_laborparticipationrate var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug lngdppc lnhealth
+
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var9_giniindex var14_gdpgrowthrate var15_inflation var16_unemploymentrate var17_laborparticipationrate var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug lngdppc lnhealth
+
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var9_giniindex var14_gdpgrowthrate var15_inflation var16_unemploymentrate var17_laborparticipationrate var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug lnhealth
+
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var9_giniindex var14_gdpgrowthrate var15_inflation var16_unemploymentrate var17_laborparticipationrate var21_depression var22_mentalhealth var23_alcoholanddrug lnhealth
+
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var9_giniindex var15_inflation var16_unemploymentrate var17_laborparticipationrate var21_depression var22_mentalhealth var23_alcoholanddrug lnhealth
+
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var3_corruptionperceptionindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var9_giniindex var15_inflation var16_unemploymentrate var17_laborparticipationrate var21_depression var22_mentalhealth var23_alcoholanddrug lnhealth
+
+regress var0_suiciderate var1_humanrightprotection var3_corruptionperceptionindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var9_giniindex var15_inflation var16_unemploymentrate var17_laborparticipationrate var21_depression var22_mentalhealth var23_alcoholanddrug lnhealth
+
+regress var0_suiciderate var1_humanrightprotection var3_corruptionperceptionindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var9_giniindex var15_inflation var17_laborparticipationrate var21_depression var22_mentalhealth var23_alcoholanddrug lnhealth
+
+regress var0_suiciderate var1_humanrightprotection var3_corruptionperceptionindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var9_giniindex var15_inflation var17_laborparticipationrate var21_depression var22_mentalhealth var23_alcoholanddrug 
+
+regress var0_suiciderate var1_humanrightprotection var3_corruptionperceptionindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var9_giniindex var17_laborparticipationrate var21_depression var22_mentalhealth var23_alcoholanddrug 
+
+regress var0_suiciderate var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var9_giniindex var17_laborparticipationrate var21_depression var22_mentalhealth var23_alcoholanddrug 
+		
+regress var0_suiciderate var5_sexratioatbirth var21_depression var22_mentalhealth var23_alcoholanddrug 
+
+regress var0_suiciderate var21_depression var22_mentalhealth var23_alcoholanddrug 
+
+encode area_code ,generate (region)
+regress var0_suiciderate var21_depression var22_mentalhealth var23_alcoholanddrug i.region, baselevels
+
+encode incomegroup, generate (income)
+regress var0_suiciderate var21_depression var22_mentalhealth var23_alcoholanddrug i.income, baselevels
+		* as income is not significant so we use region only. 
+
+* Binary logistic regression 
+egen cat_suicide = cut(var0_suiciderate), at(0,10.5,100)	
+recode cat_suicide (0=0) (10.5=1),generate (bin_suicide)
+tabulate bin_suicide
+logistic bin_suicide var21_depression var22_mentalhealth var23_alcoholanddrug 	
+* Hosmer-Lemeshow test for model fit
+estat gof ,group(10)
+	* null hypothesis of this test is H0: the model fit good with the data. 
+* classification matrix with percentages
+estat classification
+	* "+" group is > 0.5 and "-" group is < 0.5
+	* the rows of the table are the classified and the columns are the true (D is true and ~D is not true)
+	* only 65.29% is classified correctly. 
+	* we can change the threshold for classification. instead of 0.5, we can have 0.4	
+* classification graphs: lroc
+lsens
+* classify again with probability cutoff at 40%
+estat classification ,cutoff (0.4)
+	* we change the threshold for classification. instead of 0.5, we can have 0.4
+	* doesnt improve accuracy so we keep 0.5 
+
+*-------------------------------------------------------------------------------	
+* ANOVA (full data)
+encode area_code ,generate (region)
+encode incomegroup, generate (income)
+label variable region "Region"
+
+	* OnewayANOVA: comparing the means of suicide rate in different region (may be years later) 
+*tabulate gives a table of means in each year
+*bonferroni requests pairwise comparisons between years 
+oneway var0_suiciderate region, bonferroni tabulate
+		* -> There is difference between MENA vs (EAP, EURCA and SSA)
+		
+	*Twoway ANOVA with categorical covariates (without interaction)
+*graph requests a boxplot 
+*regress requests parameter estimates for all categories including the reference category
+*margins gives a table and plot of the estimated marginal means in all cells
+*estat esize gives the estimates of each effect size (i.e. contribution to r square)
+*estat hettest is the Breusch-Pagan test for heteroskedasticity
+*pwcompare tests for pairwise differences in estimated means of the income groups, 
+*controlling for the effect of year, using tukey's adjustment for multiple
+*comparisons and taking into account the different number of cases in the cells
+
+graph box var0_suiciderate, over(region) over(income)
+anova var0_suiciderate region income 
+regress ,baselevels
+margins region#income, plot
+estat esize
+estat hettest
+pwcompare region, mcompare(tukey) asobserved
+pwcompare income, mcompare(tukey) asobserved
+
+	*Twoway ANOVA with categorical covariates (with interaction)
+*means that both main effects and interaction are included 
+*pwcompare includes the option groups in order to make the output more concise
+
+anova var0_suiciderate region##income
+margins region##income, plot
+estat esize
+pwcompare region##income, mcompare(tukey) asobserved groups
+
+*Example 4. use firm age as a continuous variable, otherwise same as before
+*margins are calculated as slope coefficients of age in each industry
+*the second margins command plots the estimated means for each industry
+* at the ages of 1 5 and 10 years
+*the last margins command also requests the pairwise comparison tests to see 
+*if the slope differences are statistically significant
+
+gen alcohol = var23_alcoholanddrug
+anova var0_suiciderate c.alcohol  region region#c.alcohol
+regress
+margins region, dydx(alcohol) plot
+margins region, at(alcohol=(0 3 6)) plot
+margins region, dydx(alcohol) pwcompare
+*-------------------------------------------------------------------------------	
+* ANOVA (2017 data)
+encode area_code ,generate (region)
+encode incomegroup, generate (income)
+label variable region "Region"
+
+	* OnewayANOVA: comparing the means of suicide rate in different region (may be years later) 
+*tabulate gives a table of means in each region
+*bonferroni requests pairwise comparisons between regions 
+oneway var0_suiciderate region, bonferroni tabulate
+oneway var0_suiciderate income, bonferroni tabulate
+		* -> There is difference between MENA vs (EAP, EURCA and SSA)
+		
+	*Twoway ANOVA with categorical covariates (without interaction)
+*graph requests a boxplot 
+*regress requests parameter estimates for all categories including the reference category
+*margins gives a table and plot of the estimated marginal means in all cells
+*estat esize gives the estimates of each effect size (i.e. contribution to r square)
+*estat hettest is the Breusch-Pagan test for heteroskedasticity
+*pwcompare tests for pairwise differences in estimated means of the income groups, 
+*controlling for the effect of year, using tukey's adjustment for multiple
+*comparisons and taking into account the different number of cases in the cells
+
+graph box var0_suiciderate, over(region) over(income) xlabels(, angle(vertical))
+anova var0_suiciderate region income
+regress ,baselevels
+margins region##income, plot
+estat esize
+estat hettest
+pwcompare region, mcompare(tukey) asobserved
+pwcompare income, mcompare(tukey) asobserved
+
+	*Twoway ANOVA with categorical covariates (with interaction)
+*means that both main effects and interaction are included 
+*pwcompare includes the option groups in order to make the output more concise
+
+anova var0_suiciderate region##income
+margins region##income, plot
+
+anova var0_suiciderate income##region
+margins income##region, plot
+estat esize
+pwcompare region##income, mcompare(tukey) asobserved groups
+
+*Example 4. use firm age as a continuous variable, otherwise same as before
+*margins are calculated as slope coefficients of age in each industry
+*the second margins command plots the estimated means for each industry
+* at the ages of 1 5 and 10 years
+*the last margins command also requests the pairwise comparison tests to see 
+*if the slope differences are statistically significant
+
+gen alcohol = var23_alcoholanddrug
+anova var0_suiciderate c.alcohol  region region#c.alcohol
+regress
+margins region, dydx(alcohol) plot
+margins region, at(alcohol=(0 3 6)) plot
+margins region, dydx(alcohol) pwcompare
+
+*-------------------------------------------------------------------------------
+*** PANEL DATA ANALYSIS
+
+* regression full data 2007-2017
+	* full variables: 
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var13_gdppercapitappp var14_gdpgrowthrate var15_inflation var16_unemploymentrate var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug lngdppc
+	* only significant variables: 
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var5_sexratioatbirth var7_lifesatisfaction lngdppc var15_inflation var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug
+
+	* logarith
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty lngdppc var14_gdpgrowthrate var15_inflation var16_unemploymentrate var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug 
+
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var5_sexratioatbirth var7_lifesatisfaction lngdppc var15_inflation var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug 
+	
+	* not logarith
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var13_gdppercapitappp var14_gdpgrowthrate var15_inflation var16_unemploymentrate var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug
+
+regress var0_suiciderate var1_humanrightprotection var2_civilliberties var4_humandevelopmentindex var5_sexratioatbirth var6_internetusage var7_lifesatisfaction var8_extremepoverty var14_gdpgrowthrate var15_inflation var16_unemploymentrate var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug
+
+
+	***** PANEL DATA ANALYSIS 1: 
+encode Entity, generate (country)
+xtset country Year
+	
+	* Pooled OLS: 
+reg var0_suiciderate var1_humanrightprotection var2_civilliberties var5_sexratioatbirth var7_lifesatisfaction lngdppc var15_inflation var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug
+
+	* FE model: 
+xtreg var0_suiciderate var1_humanrightprotection var2_civilliberties var5_sexratioatbirth var7_lifesatisfaction lngdppc var15_inflation var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug, fe 
+estimates store fixed 	
+
+	* RE model: 
+xtreg var0_suiciderate var1_humanrightprotection var2_civilliberties var5_sexratioatbirth var7_lifesatisfaction lngdppc var15_inflation var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug, re 
+estimates store random
+
+	* Breusch & Pagan  test: 
+xttest0 
+
+	* Hausman test: 
+hausman fixed random 
+
+	* Stepwise FE model: 
+xtreg var0_suiciderate var1_humanrightprotection var5_sexratioatbirth var7_lifesatisfaction lngdppc var15_inflation var20_anxietydisorder var21_depression var22_mentalhealth var23_alcoholanddrug, fe 
+
+xtreg var0_suiciderate var1_humanrightprotection var5_sexratioatbirth var7_lifesatisfaction lngdppc var15_inflation var21_depression var22_mentalhealth var23_alcoholanddrug, fe 
+
+xtreg var0_suiciderate var1_humanrightprotection var5_sexratioatbirth lngdppc var15_inflation var21_depression var22_mentalhealth var23_alcoholanddrug, fe 
+
+xtreg var0_suiciderate var1_humanrightprotection var5_sexratioatbirth lngdppc var15_inflation var21_depression var23_alcoholanddrug, fe 
+
+
+
+	
